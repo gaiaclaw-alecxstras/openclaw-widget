@@ -8,24 +8,32 @@ struct Provider: TimelineProvider {
     }
     
     func getSnapshot(in context: Context, completion: @escaping (SessionStatus) -> Void) {
-        let status = loadFromSharedContainer()
+        let status = loadFromUserDefaults()
         completion(status)
     }
     
     func getTimeline(in context: Context, completion: @escaping (Timeline<SessionStatus>) -> Void) {
-        let status = loadFromSharedContainer()
+        let status = loadFromUserDefaults()
         
-        // Update more frequently when active/thinking
+        // Check if we need a more urgent update
         let updateInterval: Int
-        switch status.state {
-        case .thinking, .talking:
-            updateInterval = 30  // 30 seconds
-        case .idle:
-            updateInterval = 120 // 2 minutes
-        case .error:
-            updateInterval = 60  // 1 minute
-        case .offline:
-            updateInterval = 300 // 5 minutes
+        let lastUpdate = UserDefaults(suiteName: "group.com.openclaw.widget")?.object(forKey: "openclaw_last_update") as? Date
+        let timeSinceUpdate = lastUpdate != nil ? Int(Date().timeIntervalSince(lastUpdate!)) : 9999
+        
+        // If recent update (< 60s), refresh faster
+        if timeSinceUpdate < 60 {
+            updateInterval = 15
+        } else {
+            switch status.state {
+            case .thinking, .talking:
+                updateInterval = 30
+            case .idle:
+                updateInterval = 120
+            case .error:
+                updateInterval = 60
+            case .offline:
+                updateInterval = 300
+            }
         }
         
         let nextUpdate = Calendar.current.date(byAdding: .second, value: updateInterval, to: Date())!
@@ -33,34 +41,25 @@ struct Provider: TimelineProvider {
         completion(timeline)
     }
     
-    // MARK: - Production Data Loading
-    private func loadFromSharedContainer() -> SessionStatus {
-        // Try multiple locations for the state file
-        var possiblePaths: [URL] = []
-        
-        // Local fallback
-        if let homeDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-            possiblePaths.append(homeDir.appendingPathComponent("../Mobile Documents/com~apple~CloudDocs/openclaw-widget-state.json"))
+    // MARK: - Load from UserDefaults (set by NSE)
+    private func loadFromUserDefaults() -> SessionStatus {
+        guard let userDefaults = UserDefaults(suiteName: "group.com.openclaw.widget"),
+              let stateData = userDefaults.dictionary(forKey: "openclaw_state") else {
+            return SessionStatus.placeholder
         }
         
-        // Home directory fallback
-        if let homeDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-            possiblePaths.append(homeDir.appendingPathComponent("../../../.openclaw/widget-session-state.json"))
-        }
+        let stateStr = stateData["state"] as? String ?? "idle"
+        let tokenUsage = stateData["token_usage"] as? [String: Int] ?? ["current": 0, "limit": 200000]
         
-        // App Group (if configured)
-        if let groupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.openclaw.widget") {
-            possiblePaths.append(groupURL.appendingPathComponent("session-state.json"))
-        }
-        
-        for path in possiblePaths {
-            if let data = try? Data(contentsOf: path),
-               let status = try? JSONDecoder().decode(SessionStatus.self, from: data) {
-                return status
-            }
-        }
-        
-        // Return placeholder if no state file found
-        return SessionStatus.placeholder
+        return SessionStatus(
+            date: Date(),
+            state: SessionStatus.SessionState(rawValue: stateStr) ?? .idle,
+            tokenUsage: SessionStatus.TokenUsage(
+                current: tokenUsage["current"] ?? 0,
+                limit: tokenUsage["limit"] ?? 200000
+            ),
+            model: "kimi-k2-thinking",
+            sessionAge: stateData["session_age"] as? TimeInterval ?? 0
+        )
     }
 }

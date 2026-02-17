@@ -190,38 +190,10 @@ jobs:
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: OpenClawWidget-Build
+        name: OpenClawWidget-Project
         path: |
           openclaw-widget/build/*.zip
         if-no-files-found: warn
         
-    - name: Create Release
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: v${{ github.run_number }}
-        name: OpenClaw Widget v${{ github.run_number }}
-        files: |
-          openclaw-widget/build/*.zip
-        draft: true
-        body: |
-          OpenClaw Widget Project Files
-          
-          ## Contents
-          - Swift source files for the widget
-          - Session monitor scripts
-          - Setup and verification tools
-          - Xcode setup instructions
-          
-          ## Installation
-          1. Download `OpenClawWidget-Project.zip`
-          2. Extract and follow `XCODE_SETUP.md` instructions
-          3. Run `./setup.sh` to install the session monitor
-          4. Build in Xcode and add widget to home screen
-          
-          ## Requirements
-          - Xcode 14+
-          - iOS 15+
-          - macOS (for session monitor)
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    # Note: Release creation disabled due to permissions
+    # The artifact is available from the Actions page

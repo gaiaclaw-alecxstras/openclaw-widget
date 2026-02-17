@@ -1,7 +1,8 @@
 import WidgetKit
 import SwiftUI
 
-struct SessionStatus: Codable, TimelineEntry {
+struct SessionStatus: TimelineEntry, Codable {
+    var date: Date = Date()
     let date: Date
     let state: SessionState
     let tokenUsage: TokenUsage

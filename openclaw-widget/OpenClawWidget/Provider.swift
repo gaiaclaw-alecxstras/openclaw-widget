@@ -1,6 +1,7 @@
 import WidgetKit
 import SwiftUI
 
+@available(iOS 14.0, *)
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> SessionStatus {
         SessionStatus.placeholder
@@ -35,17 +36,22 @@ struct Provider: TimelineProvider {
     // MARK: - Production Data Loading
     private func loadFromSharedContainer() -> SessionStatus {
         // Try multiple locations for the state file
-        let possiblePaths = [
-            // iCloud Drive (preferred - syncs across devices)
-            FileManager.default.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: false)
-                .appendingPathComponent("../Mobile Documents/com~apple~CloudDocs/openclaw-widget-state.json"),
-            // Local fallback
-            FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent(".openclaw/widget-session-state.json"),
-            // App Group (if configured)
-            FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.openclaw.widget")?
-                .appendingPathComponent("session-state.json")
-        ].compactMap { $0 }
+        var possiblePaths: [URL] = []
+        
+        // Local fallback
+        if let homeDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            possiblePaths.append(homeDir.appendingPathComponent("../Mobile Documents/com~apple~CloudDocs/openclaw-widget-state.json"))
+        }
+        
+        // Home directory fallback
+        if let homeDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            possiblePaths.append(homeDir.appendingPathComponent("../../../.openclaw/widget-session-state.json"))
+        }
+        
+        // App Group (if configured)
+        if let groupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.openclaw.widget") {
+            possiblePaths.append(groupURL.appendingPathComponent("session-state.json"))
+        }
         
         for path in possiblePaths {
             if let data = try? Data(contentsOf: path),

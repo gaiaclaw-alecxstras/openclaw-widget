@@ -1,0 +1,22 @@
+# OpenClaw Widget
+
+# Logs
+*.log
+
+# User-specific state (don't commit personal session data)
+widget-session-state.json
+openclaw-widget-state.json
+
+# Xcode
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+DerivedData/
+build/
+
+# macOS
+.DS_Store
+
+# Node
+node_modules/

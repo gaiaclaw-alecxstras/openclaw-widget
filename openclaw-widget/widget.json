@@ -1,0 +1,12 @@
+{
+  "configurations": [
+    {
+      "id": "com.openclaw.widget",
+      "name": "OpenClawWidgetExtension",
+      "options": {
+        "bundleIdentifier": "com.openclaw.widget",
+        "targetName": "OpenClawWidgetExtension"
+      }
+    }
+  ]
+}

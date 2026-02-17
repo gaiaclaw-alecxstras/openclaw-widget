@@ -1,0 +1,10 @@
+{
+  "date": "2026-02-17T01:30:00Z",
+  "state": "thinking",
+  "tokenUsage": {
+    "current": 55000,
+    "limit": 200000
+  },
+  "model": "kimi-k2-thinking",
+  "sessionAge": 120
+}

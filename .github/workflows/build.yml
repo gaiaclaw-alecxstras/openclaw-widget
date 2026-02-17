@@ -1,0 +1,296 @@
+name: Build iOS Widget
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+    
+    - name: Show Xcode version
+      run: xcodebuild -version
+    
+    - name: Create iOS Project Structure
+      run: |
+        cd openclaw-widget
+        
+        # Create the Xcode project structure
+        mkdir -p OpenClawWidgetApp/OpenClawWidget
+        mkdir -p OpenClawWidgetApp/OpenClawWidgetExtension
+        
+        # Copy widget source files
+        cp OpenClawWidget/*.swift OpenClawWidgetApp/OpenClawWidgetExtension/
+        
+        # Create a minimal host app
+        cat > OpenClawWidgetApp/OpenClawWidget/main.swift << 'EOF'
+        import UIKit
+        
+        @main
+        class AppDelegate: UIResponder, UIApplicationDelegate {
+            var window: UIWindow?
+            
+            func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+                window = UIWindow(frame: UIScreen.main.bounds)
+                let vc = UIViewController()
+                vc.view.backgroundColor = .systemBackground
+                
+                let label = UILabel()
+                label.text = "OpenClaw Widget\n\nAdd the widget to your home screen"
+                label.numberOfLines = 0
+                label.textAlignment = .center
+                label.font = .preferredFont(forTextStyle: .title2)
+                label.translatesAutoresizingMaskIntoConstraints = false
+                
+                vc.view.addSubview(label)
+                NSLayoutConstraint.activate([
+                    label.centerXAnchor.constraint(equalTo: vc.view.centerXAnchor),
+                    label.centerYAnchor.constraint(equalTo: vc.view.centerYAnchor)
+                ])
+                
+                window?.rootViewController = vc
+                window?.makeKeyAndVisible()
+                return true
+            }
+        }
+        EOF
+        
+        # Create Info.plist for host app
+        cat > OpenClawWidgetApp/OpenClawWidget/Info.plist << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleDevelopmentRegion</key>
+            <string>$(DEVELOPMENT_LANGUAGE)</string>
+            <key>CFBundleExecutable</key>
+            <string>$(EXECUTABLE_NAME)</string>
+            <key>CFBundleIdentifier</key>
+            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+            <key>CFBundleInfoDictionaryVersion</key>
+            <string>6.0</string>
+            <key>CFBundleName</key>
+            <string>$(PRODUCT_NAME)</string>
+            <key>CFBundlePackageType</key>
+            <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0</string>
+            <key>CFBundleVersion</key>
+            <string>1</string>
+            <key>LSRequiresIPhoneOS</key>
+            <true/>
+            <key>UIApplicationSceneManifest</key>
+            <dict>
+                <key>UIApplicationSupportsMultipleScenes</key>
+                <false/>
+            </dict>
+            <key>UILaunchStoryboardName</key>
+            <string>LaunchScreen</string>
+            <key>UIRequiredDeviceCapabilities</key>
+            <array>
+                <string>armv7</string>
+            </array>
+            <key>UISupportedInterfaceOrientations</key>
+            <array>
+                <string>UIInterfaceOrientationPortrait</string>
+            </array>
+        </dict>
+        </plist>
+        EOF
+        
+        # Create Info.plist for widget extension
+        cat > OpenClawWidgetApp/OpenClawWidgetExtension/Info.plist << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleDevelopmentRegion</key>
+            <string>$(DEVELOPMENT_LANGUAGE)</string>
+            <key>CFBundleDisplayName</key>
+            <string>OpenClaw Widget</string>
+            <key>CFBundleExecutable</key>
+            <string>$(EXECUTABLE_NAME)</string>
+            <key>CFBundleIdentifier</key>
+            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+            <key>CFBundleInfoDictionaryVersion</key>
+            <string>6.0</string>
+            <key>CFBundleName</key>
+            <string>$(PRODUCT_NAME)</string>
+            <key>CFBundlePackageType</key>
+            <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0</string>
+            <key>CFBundleVersion</key>
+            <string>1</string>
+            <key>NSExtension</key>
+            <dict>
+                <key>NSExtensionPointIdentifier</key>
+                <string>com.apple.widgetkit-extension</string>
+            </dict>
+        </dict>
+        </plist>
+        EOF
+        
+        # Create entitlements files
+        cat > OpenClawWidgetApp/OpenClawWidget/OpenClawWidget.entitlements << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>com.apple.security.application-groups</key>
+            <array>
+                <string>group.com.openclaw.widget</string>
+            </array>
+        </dict>
+        </plist>
+        EOF
+        
+        cp OpenClawWidgetApp/OpenClawWidget/OpenClawWidget.entitlements OpenClawWidgetApp/OpenClawWidgetExtension/OpenClawWidgetExtension.entitlements
+        
+        # Create project.pbxproj would be complex, let's use xcodegen instead
+        
+    - name: Install XcodeGen
+      run: brew install xcodegen
+      
+    - name: Generate Xcode Project
+      run: |
+        cd openclaw-widget/OpenClawWidgetApp
+        
+        cat > project.yml << 'EOF'
+        name: OpenClawWidget
+        options:
+          bundleIdPrefix: com.openclaw
+          deploymentTarget:
+            iOS: "15.0"
+        
+        settings:
+          base:
+            SWIFT_VERSION: "5.5"
+            TARGETED_DEVICE_FAMILY: "1"
+            CODE_SIGN_IDENTITY: ""
+            CODE_SIGNING_REQUIRED: NO
+            CODE_SIGNING_ALLOWED: NO
+        
+        targets:
+          OpenClawWidget:
+            type: application
+            platform: iOS
+            sources:
+              - OpenClawWidget
+            settings:
+              PRODUCT_BUNDLE_IDENTIFIER: com.openclaw.widget.app
+              INFOPLIST_FILE: OpenClawWidget/Info.plist
+            entitlements:
+              path: OpenClawWidget/OpenClawWidget.entitlements
+        
+          OpenClawWidgetExtension:
+            type: appExtension
+            platform: iOS
+            sources:
+              - OpenClawWidgetExtension
+            settings:
+              PRODUCT_BUNDLE_IDENTIFIER: com.openclaw.widget.app.widget
+              INFOPLIST_FILE: OpenClawWidgetExtension/Info.plist
+            entitlements:
+              path: OpenClawWidgetExtension/OpenClawWidgetExtension.entitlements
+            dependencies:
+              - target: OpenClawWidget
+        EOF
+        
+        xcodegen generate
+        
+    - name: Build Archive
+      run: |
+        cd openclaw-widget/OpenClawWidgetApp
+        
+        xcodebuild archive \
+          -project OpenClawWidget.xcodeproj \
+          -scheme OpenClawWidget \
+          -destination "generic/platform=iOS" \
+          -archivePath build/OpenClawWidget.xcarchive \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO \
+          | xcpretty
+          
+    - name: Export IPA
+      run: |
+        cd openclaw-widget/OpenClawWidgetApp
+        
+        # Create export options plist for unsigned export
+        cat > build/ExportOptions.plist << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>method</key>
+            <string>development</string>
+            <key>teamID</key>
+            <string></string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>thinning</key>
+            <string>&lt;none&gt;</string>
+        </dict>
+        </plist>
+        EOF
+        
+        # Export the IPA
+        xcodebuild -exportArchive \
+          -archivePath build/OpenClawWidget.xcarchive \
+          -exportPath build \
+          -exportOptionsPlist build/ExportOptions.plist \
+          | xcpretty || true
+          
+        # List what we got
+        ls -la build/
+        
+    - name: Package for Distribution
+      run: |
+        cd openclaw-widget/OpenClawWidgetApp/build
+        
+        # Find the IPA
+        IPA_FILE=$(find . -name "*.ipa" | head -1)
+        
+        if [ -f "$IPA_FILE" ]; then
+          echo "Found IPA: $IPA_FILE"
+          mv "$IPA_FILE" ../../OpenClawWidget.ipa
+        else
+          echo "IPA not found, packaging xcarchive instead"
+          zip -r ../../OpenClawWidget.xcarchive.zip OpenClawWidget.xcarchive
+        fi
+        
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: OpenClawWidget
+        path: |
+          openclaw-widget/*.ipa
+          openclaw-widget/*.xcarchive.zip
+        if-no-files-found: warn
+        
+    - name: Create Release
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ github.run_number }}
+        name: OpenClaw Widget v${{ github.run_number }}
+        files: |
+          openclaw-widget/*.ipa
+          openclaw-widget/*.xcarchive.zip
+        draft: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
